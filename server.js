@@ -1,8 +1,18 @@
 const express = require('express');
 const expressWs = require('express-ws');
+const subdomain = require('express-subdomain');
+const bodyParser = require('body-parser');
+const { v4: uuidv4 } = require('uuid');
 
 const app = express();
 expressWs(app);
+
+// Middleware to parse JSON and raw bodies
+app.use(bodyParser.json({ limit: '10mb', type: ['application/json'] }));
+app.use(bodyParser.raw({ type: '*/*', limit: '10mb' }));
+
+// Store mapping from subdomain ID to websocket client
+const wsClients = new Map();
 
 function generateFunId() {
   const colors = ['purple', 'blue', 'green', 'red', 'yellow', 'orange', 'pink', 'teal', 'silver', 'gold'];
@@ -13,12 +23,93 @@ function generateFunId() {
   return `${randomColor}-${randomAnimal}-${randomSuffix}`;
 }
 
+// WebSocket endpoint for CLI tools to connect
 app.ws('/ws', function(ws, req) {
   console.log('A new CLI tool has connected.');
   const id = generateFunId();
+  wsClients.set(id, ws);
   const url = `https://${id}.mirage.live`;
   ws.send(JSON.stringify({ type: 'url', data: url }));
+
+  ws.on('close', () => {
+    wsClients.delete(id);
+    console.log(`[Mirage] CLI tool for ${id} disconnected.`);
+  });
 });
+
+// Helper: Extract subdomain from host (e.g., teal-tiger-cak8.onrender.com)
+function extractSubdomain(host) {
+  if (!host) return null;
+  const parts = host.split('.');
+  if (parts.length < 3) return null; // e.g., localhost or no subdomain
+  return parts[0];
+}
+
+// Proxy handler for all subdomains
+app.use(subdomain('*', async (req, res, next) => {
+  const subdomainId = extractSubdomain(req.headers.host);
+  if (!subdomainId) return res.status(400).send('Invalid subdomain');
+  const ws = wsClients.get(subdomainId);
+  if (!ws || ws.readyState !== 1) {
+    return res.status(502).send('No active relay for this subdomain');
+  }
+
+  // Generate a unique request ID for matching response
+  const requestId = uuidv4();
+
+  // Prepare the request payload
+  let body = req.body;
+  if (Buffer.isBuffer(body)) {
+    body = body.toString('base64'); // Send as base64 if binary
+  }
+
+  const payload = {
+    type: 'proxy-request',
+    requestId,
+    method: req.method,
+    path: req.originalUrl,
+    headers: req.headers,
+    body,
+    isBase64: Buffer.isBuffer(req.body)
+  };
+
+  // Set up a one-time message handler for the response
+  const handleMessage = (msg) => {
+    try {
+      const data = JSON.parse(msg);
+      if (data.type === 'proxy-response' && data.requestId === requestId) {
+        // Clean up listener
+        ws.off('message', handleMessage);
+        // Set headers and status
+        if (data.headers) {
+          Object.entries(data.headers).forEach(([k, v]) => res.setHeader(k, v));
+        }
+        res.status(data.statusCode || 200);
+        // Send body (decode if base64)
+        if (data.isBase64 && data.body) {
+          res.send(Buffer.from(data.body, 'base64'));
+        } else {
+          res.send(data.body);
+        }
+      }
+    } catch (err) {
+      // Ignore parse errors for unrelated messages
+    }
+  };
+  ws.on('message', handleMessage);
+
+  // Send the request to the CLI tool
+  ws.send(JSON.stringify(payload));
+
+  // Timeout if no response in 30s
+  const timeout = setTimeout(() => {
+    ws.off('message', handleMessage);
+    res.status(504).send('Relay timeout');
+  }, 30000);
+
+  // Clean up timeout on finish
+  res.on('finish', () => clearTimeout(timeout));
+}));
 
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
