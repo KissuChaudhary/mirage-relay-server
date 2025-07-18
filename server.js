@@ -1,6 +1,5 @@
 const express = require('express');
 const expressWs = require('express-ws');
-const subdomain = require('express-subdomain');
 const bodyParser = require('body-parser');
 const { v4: uuidv4 } = require('uuid');
 
@@ -28,7 +27,8 @@ app.ws('/ws', function(ws, req) {
   console.log('A new CLI tool has connected.');
   const id = generateFunId();
   wsClients.set(id, ws);
-  const url = `https://${id}.mirage.live`;
+  // Construct the shareable URL using the custom domain
+  const url = `https://${id}.codewp.online`;
   ws.send(JSON.stringify({ type: 'url', data: url }));
 
   ws.on('close', () => {
@@ -37,18 +37,25 @@ app.ws('/ws', function(ws, req) {
   });
 });
 
-// Helper: Extract subdomain from host (e.g., teal-tiger-cak8.onrender.com)
+// Helper: Extract subdomain from host (e.g., teal-tiger-cak8.codewp.online)
 function extractSubdomain(host) {
   if (!host) return null;
   const parts = host.split('.');
-  if (parts.length < 3) return null; // e.g., localhost or no subdomain
-  return parts[0];
+  // Expecting: [subdomain, 'codewp', 'online']
+  if (parts.length < 3) return null;
+  // Only match subdomains of codewp.online
+  if (parts[parts.length - 2] !== 'codewp' || parts[parts.length - 1] !== 'online') return null;
+  return parts.slice(0, parts.length - 2).join('.');
 }
 
-// Proxy handler for all subdomains
-app.use(subdomain('*', async (req, res, next) => {
-  const subdomainId = extractSubdomain(req.headers.host);
-  if (!subdomainId) return res.status(400).send('Invalid subdomain');
+// Proxy handler for all HTTP requests to subdomains of codewp.online
+app.use(async (req, res, next) => {
+  const host = req.headers.host;
+  const subdomainId = extractSubdomain(host);
+  // Only handle requests for *.codewp.online
+  if (!subdomainId || !host.endsWith('.codewp.online')) {
+    return res.status(400).send('Invalid or missing subdomain');
+  }
   const ws = wsClients.get(subdomainId);
   if (!ws || ws.readyState !== 1) {
     return res.status(502).send('No active relay for this subdomain');
@@ -78,14 +85,11 @@ app.use(subdomain('*', async (req, res, next) => {
     try {
       const data = JSON.parse(msg);
       if (data.type === 'proxy-response' && data.requestId === requestId) {
-        // Clean up listener
         ws.off('message', handleMessage);
-        // Set headers and status
         if (data.headers) {
           Object.entries(data.headers).forEach(([k, v]) => res.setHeader(k, v));
         }
         res.status(data.statusCode || 200);
-        // Send body (decode if base64)
         if (data.isBase64 && data.body) {
           res.send(Buffer.from(data.body, 'base64'));
         } else {
@@ -107,9 +111,8 @@ app.use(subdomain('*', async (req, res, next) => {
     res.status(504).send('Relay timeout');
   }, 30000);
 
-  // Clean up timeout on finish
   res.on('finish', () => clearTimeout(timeout));
-}));
+});
 
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
