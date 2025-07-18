@@ -91,10 +91,23 @@ app.use(async (req, res, next) => {
       const data = JSON.parse(msg);
       if (data.type === 'proxy-response' && data.requestId === requestId) {
         ws.off('message', handleMessage);
-        if (data.headers) {
-          Object.entries(data.headers).forEach(([k, v]) => res.setHeader(k, v));
-        }
+        // Sanitize and set response headers
+        const responseHeaders = data.headers || {};
+        // These headers are often problematic in proxies
+        delete responseHeaders['transfer-encoding'];
+        delete responseHeaders['content-encoding'];
+        delete responseHeaders['content-length']; // The framework will set this correctly
+
         res.status(data.statusCode || 200);
+
+        if (responseHeaders) {
+          Object.entries(responseHeaders).forEach(([k, v]) => {
+            // Avoid setting problematic headers like 'Connection'
+            if (k.toLowerCase() !== 'connection') {
+              res.setHeader(k, v);
+            }
+          });
+        }
         if (data.isBase64 && data.body) {
           res.send(Buffer.from(data.body, 'base64'));
         } else {
