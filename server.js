@@ -65,9 +65,15 @@ app.use(async (req, res, next) => {
   const requestId = uuidv4();
 
   // Prepare the request payload
-  let body = req.body;
+    let body = req.body;
+  let isBase64 = false;
+
   if (Buffer.isBuffer(body)) {
-    body = body.toString('base64'); // Send as base64 if binary
+    body = body.toString('base64');
+    isBase64 = true;
+  } else if (typeof body === 'object' && body !== null) {
+    // CRITICAL FIX: Stringify JSON objects before sending
+    body = JSON.stringify(body);
   }
 
   const payload = {
@@ -77,9 +83,8 @@ app.use(async (req, res, next) => {
     path: req.originalUrl,
     headers: req.headers,
     body,
-    isBase64: Buffer.isBuffer(req.body)
+    isBase64
   };
-
   // Set up a one-time message handler for the response
   const handleMessage = (msg) => {
     try {
