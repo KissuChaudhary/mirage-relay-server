@@ -173,4 +173,43 @@
   
   modalSendButton.addEventListener('click', sendFeedback);
 
+  // --- DEVELOPER REPLY TOAST ---
+  if (window.Mirage && window.Mirage.socket) {
+    window.Mirage.socket.addEventListener('message', function (event) {
+      let msg;
+      try {
+        msg = JSON.parse(event.data);
+      } catch (e) {
+        return;
+      }
+      if (msg && msg.type === 'developer-reply' && msg.data && msg.data.message) {
+        showDeveloperToast(msg.data.message);
+      }
+    });
+  }
+
+  function showDeveloperToast(message) {
+    const toast = document.createElement('div');
+    toast.textContent = message;
+    toast.style.position = 'fixed';
+    toast.style.bottom = '32px';
+    toast.style.left = '50%';
+    toast.style.transform = 'translateX(-50%)';
+    toast.style.background = 'rgba(30, 41, 59, 0.98)';
+    toast.style.color = '#fff';
+    toast.style.padding = '14px 28px';
+    toast.style.borderRadius = '10px';
+    toast.style.fontSize = '1rem';
+    toast.style.fontFamily = 'inherit';
+    toast.style.boxShadow = '0 4px 24px rgba(0,0,0,0.18)';
+    toast.style.zIndex = '2147483647';
+    toast.style.opacity = '1';
+    toast.style.transition = 'opacity 0.5s';
+    document.body.appendChild(toast);
+    setTimeout(() => {
+      toast.style.opacity = '0';
+      setTimeout(() => toast.remove(), 600);
+    }, 5000);
+  }
+
 })();
