@@ -41,11 +41,15 @@ app.ws('/ws', function(ws, req) {
 function extractSubdomain(host) {
   if (!host) return null;
   const parts = host.split('.');
-  // Expecting: [subdomain, 'codewp', 'online']
+  // Expecting: [subdomain, 'threddr', 'com']
   if (parts.length < 3) return null;
-  // Only match subdomains of threddr.com
-  if (parts[parts.length - 2] !== 'codewp' || parts[parts.length - 1] !== 'online') return null;
-  return parts.slice(0, parts.length - 2).join('.');
+  
+  // THE CRITICAL FIX IS HERE
+  if (parts[parts.length - 2] !== 'threddr' || parts[parts.length - 1] !== 'com') {
+    return null;
+  }
+  
+  return parts[0]; // Return just the first part (the random ID)
 }
 
 // Proxy handler for all HTTP requests to subdomains of threddr.com
