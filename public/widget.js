@@ -176,6 +176,7 @@
   // --- DEVELOPER REPLY TOAST ---
   if (window.Mirage && window.Mirage.socket) {
     window.Mirage.socket.addEventListener('message', function (event) {
+      console.log('[Mirage] Raw message received:', event.data); // DEBUG LOG
       let msg;
       try {
         msg = JSON.parse(event.data);
