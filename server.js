@@ -34,6 +34,9 @@ app.ws('/ws', function(ws, req) {
   if (subdomainId && wsClients.has(subdomainId)) {
     // --- THIS IS A BROWSER CONNECTING ---
     console.log(`[Socket] Browser connected for session: ${subdomainId}`);
+    if (!global.browserWsMap) global.browserWsMap = new Map();
+    global.browserWsMap.set(subdomainId, ws);
+    console.log('[Relay] browserWsMap set for subdomain:', subdomainId);
 
     // Listen for feedback messages from THIS browser
     ws.on('message', (msg) => {
@@ -48,6 +51,8 @@ app.ws('/ws', function(ws, req) {
     
     ws.on('close', () => {
         console.log(`[Socket] Browser for ${subdomainId} disconnected.`);
+        if (global.browserWsMap) global.browserWsMap.delete(subdomainId);
+        console.log('[Relay] browserWsMap deleted for subdomain:', subdomainId);
     });
 
   } else {
@@ -55,6 +60,7 @@ app.ws('/ws', function(ws, req) {
     console.log('[Socket] A new CLI tool has connected.');
     const id = generateFunId();
     wsClients.set(id, ws);
+    console.log('[Relay] CLI connected with id:', id);
     
     // The CLI does not need to listen for messages here,
     // the proxy handler attaches one-time listeners.
@@ -77,12 +83,14 @@ app.ws('/ws', function(ws, req) {
       }
       if (parsed && parsed.type === 'developer-reply') {
         // Find the browser websocket for this session
-        // We need to track browser websockets by subdomainId
-        // We'll use a global map for browser websockets
         if (!global.browserWsMap) global.browserWsMap = new Map();
         const browserWs = global.browserWsMap.get(id);
+        console.log('[Relay] Attempting to forward developer-reply to browser for id:', id, 'browserWs exists:', !!browserWs);
         if (browserWs && browserWs.readyState === 1) {
           browserWs.send(msg);
+          console.log('[Relay] developer-reply sent to browser for id:', id);
+        } else {
+          console.log('[Relay] No browser websocket found or not open for id:', id);
         }
       }
     });
