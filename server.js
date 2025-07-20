@@ -10,6 +10,9 @@ expressWs(app);
 app.use(bodyParser.json({ limit: '10mb', type: ['application/json'] }));
 app.use(bodyParser.raw({ type: '*/*', limit: '10mb' }));
 
+// Serve static files from the 'public' directory
+app.use(express.static('public'));
+
 // Store mapping from subdomain ID to websocket client
 const wsClients = new Map();
 
@@ -112,7 +115,15 @@ app.use(async (req, res, next) => {
             }
           });
         }
-        if (data.isBase64 && data.body) {
+        // Injection logic for HTML responses
+        const contentType = (responseHeaders['content-type'] || '').toLowerCase();
+        if (data.isBase64 && data.body && contentType.includes('text/html')) {
+          let html = Buffer.from(data.body, 'base64').toString('utf8');
+          // Inject the script before </body>
+          html = html.replace(/<\/body>/i, '<script src="/widget.js"></script></body>');
+          const modifiedBody = Buffer.from(html, 'utf8').toString('base64');
+          res.send(Buffer.from(modifiedBody, 'base64'));
+        } else if (data.isBase64 && data.body) {
           res.send(Buffer.from(data.body, 'base64'));
         } else {
           res.send(data.body);
