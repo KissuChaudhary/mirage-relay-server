@@ -119,8 +119,14 @@ app.use(async (req, res, next) => {
         const contentType = (responseHeaders['content-type'] || '').toLowerCase();
         if (data.isBase64 && data.body && contentType.includes('text/html')) {
           let html = Buffer.from(data.body, 'base64').toString('utf8');
-          // Inject the script before </body>
-          html = html.replace(/<\/body>/i, '<script src="/widget.js"></script></body>');
+          // Inject the setup script and widget.js script before </body>
+          const setupScript = `<script>window.Mirage = {};
+const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+const wsUrl = wsProtocol + '//' + window.location.host + '/ws';
+window.Mirage.socket = new WebSocket(wsUrl);
+window.Mirage.socket.onopen = () => console.log('Mirage feedback socket connected.');</script>`;
+          const widgetScript = '<script src="/widget.js"></script>';
+          html = html.replace(/<\/body>/i, `${setupScript}${widgetScript}</body>`);
           const modifiedBody = Buffer.from(html, 'utf8').toString('base64');
           res.send(Buffer.from(modifiedBody, 'base64'));
         } else if (data.isBase64 && data.body) {
