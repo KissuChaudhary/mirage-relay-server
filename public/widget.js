@@ -289,31 +289,25 @@
 
   // --- SEND FEEDBACK ---
   function sendFeedback(selector, comment) {
-    // Try to find a WebSocket connection
-    let ws = null;
-    // Try global ws (from Mirage CLI)
-    if (window.ws && window.ws.readyState === 1) ws = window.ws;
-    // Try to find any open WebSocket
-    if (!ws) {
-      for (const k in window) {
-        if (window[k] && window[k] instanceof WebSocket && window[k].readyState === 1) {
-          ws = window[k];
-          break;
-        }
-      }
-    }
-    if (!ws) {
-      alert('Could not send feedback: No WebSocket connection found.');
-      return;
-    }
-    ws.send(JSON.stringify({
+    // Use the injected Mirage WebSocket connection
+    const payload = {
       type: 'feedback',
       data: {
         selector,
         comment,
         path: window.location.pathname
       }
-    }));
+    };
+    if (window.Mirage && window.Mirage.socket && window.Mirage.socket.readyState === 1) {
+      window.Mirage.socket.send(JSON.stringify(payload));
+    } else {
+      const msg = 'Mirage feedback connection not ready.';
+      if (window.Mirage && window.Mirage.socket) {
+        console.error(msg);
+      } else {
+        alert(msg);
+      }
+    }
   }
 
   // --- INIT ---
