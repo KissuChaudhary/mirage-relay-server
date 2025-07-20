@@ -206,11 +206,31 @@
     toast.style.zIndex = '2147483647';
     toast.style.opacity = '1';
     toast.style.transition = 'opacity 0.5s';
+    toast.style.display = 'flex';
+    toast.style.alignItems = 'center';
+    toast.style.gap = '16px';
+
+    // Add close button
+    const closeBtn = document.createElement('button');
+    closeBtn.textContent = '×';
+    closeBtn.style.background = 'transparent';
+    closeBtn.style.border = 'none';
+    closeBtn.style.color = '#fff';
+    closeBtn.style.fontSize = '1.5rem';
+    closeBtn.style.cursor = 'pointer';
+    closeBtn.style.marginLeft = '8px';
+    closeBtn.setAttribute('aria-label', 'Close');
+    closeBtn.onclick = () => {
+      toast.style.opacity = '0';
+      setTimeout(() => toast.remove(), 600);
+    };
+    toast.appendChild(closeBtn);
+
     document.body.appendChild(toast);
     setTimeout(() => {
       toast.style.opacity = '0';
       setTimeout(() => toast.remove(), 600);
-    }, 5000);
+    }, 12000); // 12 seconds
   }
 
 })();
