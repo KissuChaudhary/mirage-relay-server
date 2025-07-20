@@ -28,7 +28,7 @@ app.ws('/ws', function(ws, req) {
   const id = generateFunId();
   wsClients.set(id, ws);
   // Construct the shareable URL using the custom domain
-  const url = `https://${id}.codewp.online`;
+  const url = `https://${id}.threddr.com`;
   ws.send(JSON.stringify({ type: 'url', data: url }));
 
   ws.on('close', () => {
@@ -37,23 +37,23 @@ app.ws('/ws', function(ws, req) {
   });
 });
 
-// Helper: Extract subdomain from host (e.g., teal-tiger-cak8.codewp.online)
+// Helper: Extract subdomain from host (e.g., teal-tiger-cak8.threddr.com)
 function extractSubdomain(host) {
   if (!host) return null;
   const parts = host.split('.');
   // Expecting: [subdomain, 'codewp', 'online']
   if (parts.length < 3) return null;
-  // Only match subdomains of codewp.online
+  // Only match subdomains of threddr.com
   if (parts[parts.length - 2] !== 'codewp' || parts[parts.length - 1] !== 'online') return null;
   return parts.slice(0, parts.length - 2).join('.');
 }
 
-// Proxy handler for all HTTP requests to subdomains of codewp.online
+// Proxy handler for all HTTP requests to subdomains of threddr.com
 app.use(async (req, res, next) => {
   const host = req.headers.host;
   const subdomainId = extractSubdomain(host);
-  // Only handle requests for *.codewp.online
-  if (!subdomainId || !host.endsWith('.codewp.online')) {
+  // Only handle requests for *.threddr.com
+  if (!subdomainId || !host.endsWith('.threddr.com')) {
     return res.status(400).send('Invalid or missing subdomain');
   }
   const ws = wsClients.get(subdomainId);
