@@ -25,19 +25,48 @@ function generateFunId() {
   return `${randomColor}-${randomAnimal}-${randomSuffix}`;
 }
 
-// WebSocket endpoint for CLI tools to connect
+// WebSocket endpoint for BOTH CLI tools and Browsers
 app.ws('/ws', function(ws, req) {
-  console.log('A new CLI tool has connected.');
-  const id = generateFunId();
-  wsClients.set(id, ws);
-  // Construct the shareable URL using the custom domain
-  const url = `https://${id}.threddr.com`;
-  ws.send(JSON.stringify({ type: 'url', data: url }));
+  const host = req.headers.host;
+  const subdomainId = extractSubdomain(host);
 
-  ws.on('close', () => {
-    wsClients.delete(id);
-    console.log(`[Mirage] CLI tool for ${id} disconnected.`);
-  });
+  // Check if this connection is from a browser or the CLI
+  if (subdomainId && wsClients.has(subdomainId)) {
+    // --- THIS IS A BROWSER CONNECTING ---
+    console.log(`[Socket] Browser connected for session: ${subdomainId}`);
+
+    // Listen for feedback messages from THIS browser
+    ws.on('message', (msg) => {
+      // Find the correct CLI tool's websocket
+      const cliWs = wsClients.get(subdomainId);
+      if (cliWs && cliWs.readyState === 1) { // 1 means OPEN
+        console.log(`[Forwarding] Relaying feedback from browser to CLI for session ${subdomainId}`);
+        // Forward the exact message to the CLI tool
+        cliWs.send(msg);
+      }
+    });
+    
+    ws.on('close', () => {
+        console.log(`[Socket] Browser for ${subdomainId} disconnected.`);
+    });
+
+  } else {
+    // --- THIS IS A CLI CONNECTING ---
+    console.log('[Socket] A new CLI tool has connected.');
+    const id = generateFunId();
+    wsClients.set(id, ws);
+    
+    // The CLI does not need to listen for messages here,
+    // the proxy handler attaches one-time listeners.
+    
+    const url = `https://${id}.threddr.com`;
+    ws.send(JSON.stringify({ type: 'url', data: url }));
+
+    ws.on('close', () => {
+      wsClients.delete(id);
+      console.log(`[Socket] CLI tool for ${id} disconnected.`);
+    });
+  }
 });
 
 // Helper: Extract subdomain from host (e.g., teal-tiger-cak8.threddr.com)
