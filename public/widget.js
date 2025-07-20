@@ -17,7 +17,14 @@
     #__mirage_feedback_button { position: fixed; bottom: 20px; right: 20px; width: 50px; height: 50px; background: #2c3e50; color: white; border-radius: 50%; border: none; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 12px rgba(0,0,0,0.2); cursor: pointer; z-index: 999999998; transition: transform 0.2s, background 0.2s; }
     #__mirage_feedback_button:hover { background: #34495e; }
     #__mirage_feedback_button.active { transform: scale(0.9); background: #c0392b; }
-    #__mirage_feedback_overlay { position: fixed; inset: 0; background: rgba(100, 116, 139, 0.4); z-index: 999999997; cursor: crosshair; }
+        #__mirage_feedback_overlay { 
+      position: fixed; 
+      inset: 0; 
+      background: rgba(100, 116, 139, 0.4); 
+      z-index: 999999997; 
+      cursor: crosshair;
+      pointer-events: none; /* <-- THE MAGIC BULLET */
+    }
     #__mirage_feedback_banner { position: fixed; top: 0; left: 50%; transform: translateX(-50%); background: #2c3e50; color: white; padding: 8px 20px; border-radius: 0 0 8px 8px; font-family: sans-serif; font-size: 14px; z-index: 999999999; }
     #__mirage_feedback_modal { display: none; position: fixed; width: 280px; background: white; border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.25); z-index: 999999999; padding: 16px; font-family: sans-serif; }
     #__mirage_feedback_modal.visible { display: flex; flex-direction: column; gap: 10px; }
