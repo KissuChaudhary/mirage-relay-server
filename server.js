@@ -66,6 +66,26 @@ app.ws('/ws', function(ws, req) {
       wsClients.delete(id);
       console.log(`[Socket] CLI tool for ${id} disconnected.`);
     });
+
+    // Listen for messages from the CLI (e.g., developer-reply)
+    ws.on('message', (msg) => {
+      let parsed;
+      try {
+        parsed = JSON.parse(msg);
+      } catch (e) {
+        return;
+      }
+      if (parsed && parsed.type === 'developer-reply') {
+        // Find the browser websocket for this session
+        // We need to track browser websockets by subdomainId
+        // We'll use a global map for browser websockets
+        if (!global.browserWsMap) global.browserWsMap = new Map();
+        const browserWs = global.browserWsMap.get(id);
+        if (browserWs && browserWs.readyState === 1) {
+          browserWs.send(msg);
+        }
+      }
+    });
   }
 });
 
