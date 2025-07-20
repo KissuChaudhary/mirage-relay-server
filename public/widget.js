@@ -149,15 +149,15 @@
   button.addEventListener('click', toggleFeedbackMode);
 
   function toggleFeedbackMode() {
-    feedbackMode = !feedbackMode;
     if (feedbackMode) {
-      enterFeedbackMode();
-    } else {
       exitFeedbackMode();
+    } else {
+      enterFeedbackMode();
     }
   }
 
   function enterFeedbackMode() {
+    feedbackMode = true;
     // Overlay
     overlay = document.createElement('div');
     overlay.id = OVERLAY_ID;
@@ -174,6 +174,7 @@
   }
 
   function exitFeedbackMode() {
+    feedbackMode = false;
     if (overlay) overlay.remove();
     if (banner) banner.remove();
     if (modal) modal.remove();
