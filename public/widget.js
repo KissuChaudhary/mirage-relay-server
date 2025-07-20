@@ -1,16 +1,13 @@
-(function initMirageFeedback() {
-  if (window.__mirageFeedbackLoaded) return;
-  window.__mirageFeedbackLoaded = true;
-
+// Mirage Feedback Widget
+(function MirageFeedbackWidget() {
   // --- CONFIG ---
-  const BUTTON_SIZE = 56;
-  const BUTTON_ICON = `<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>`;
-  const CLOSE_ICON = `<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>`;
-  const OVERLAY_ID = '__mirage_feedback_overlay';
   const BUTTON_ID = '__mirage_feedback_btn';
+  const OVERLAY_ID = '__mirage_feedback_overlay';
   const BANNER_ID = '__mirage_feedback_banner';
   const MODAL_ID = '__mirage_feedback_modal';
   const STYLE_ID = '__mirage_feedback_style';
+  let feedbackMode = false;
+  let lastClickTarget = null;
 
   // --- CSS ---
   const css = `
@@ -18,8 +15,8 @@
       position: fixed;
       bottom: 24px;
       right: 24px;
-      width: ${BUTTON_SIZE}px;
-      height: ${BUTTON_SIZE}px;
+      width: 56px;
+      height: 56px;
       border-radius: 50%;
       background: #18181b;
       color: #fff;
@@ -32,6 +29,7 @@
       transition: background 0.2s;
       border: none;
       outline: none;
+      font-size: 28px;
     }
     #${BUTTON_ID}:hover {
       background: #27272a;
@@ -120,7 +118,7 @@
     }
   `;
 
-  // --- STYLE INJECTION ---
+  // --- CSS INJECTION ---
   if (!document.getElementById(STYLE_ID)) {
     const style = document.createElement('style');
     style.id = STYLE_ID;
@@ -128,44 +126,41 @@
     document.head.appendChild(style);
   }
 
-  // --- BUTTON ---
-  let feedbackMode = false;
-  let overlay, banner, modal, lastClickTarget;
-
-  function createButton() {
-    let btn = document.getElementById(BUTTON_ID);
-    if (btn) return btn;
-    btn = document.createElement('button');
-    btn.id = BUTTON_ID;
-    btn.type = 'button';
-    btn.innerHTML = BUTTON_ICON;
-    btn.setAttribute('aria-label', 'Leave feedback');
-    btn.onclick = toggleFeedbackMode;
-    document.body.appendChild(btn);
-    return btn;
+  // --- HTML ELEMENTS ---
+  // Floating feedback button
+  let button = document.getElementById(BUTTON_ID);
+  if (!button) {
+    button = document.createElement('button');
+    button.id = BUTTON_ID;
+    button.type = 'button';
+    button.innerHTML = '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>';
+    button.setAttribute('aria-label', 'Leave feedback');
+    document.body.appendChild(button);
   }
+
+  // Overlay (created on demand)
+  let overlay = null;
+  // Banner (created on demand)
+  let banner = null;
+  // Modal (created on demand)
+  let modal = null;
+
+  // --- EVENT LISTENERS ---
+  button.addEventListener('click', toggleFeedbackMode);
 
   function toggleFeedbackMode() {
     feedbackMode = !feedbackMode;
-    const btn = document.getElementById(BUTTON_ID);
-    if (!btn) return;
     if (feedbackMode) {
-      btn.innerHTML = CLOSE_ICON;
-      btn.setAttribute('aria-label', 'Close feedback');
       enterFeedbackMode();
     } else {
-      btn.innerHTML = BUTTON_ICON;
-      btn.setAttribute('aria-label', 'Leave feedback');
       exitFeedbackMode();
     }
   }
 
-  // --- FEEDBACK MODE ---
   function enterFeedbackMode() {
     // Overlay
     overlay = document.createElement('div');
     overlay.id = OVERLAY_ID;
-    overlay.onclick = onOverlayClick;
     document.body.appendChild(overlay);
     // Banner
     banner = document.createElement('div');
@@ -174,8 +169,8 @@
     document.body.appendChild(banner);
     // Cursor
     document.body.style.cursor = 'crosshair';
-    // Trap tab focus
-    document.addEventListener('keydown', trapTab, true);
+    // Listen for clicks
+    document.addEventListener('click', onDocumentClick, true);
   }
 
   function exitFeedbackMode() {
@@ -184,26 +179,27 @@
     if (modal) modal.remove();
     overlay = banner = modal = null;
     document.body.style.cursor = '';
-    document.removeEventListener('keydown', trapTab, true);
+    document.removeEventListener('click', onDocumentClick, true);
+    lastClickTarget = null;
   }
 
-  // --- OVERLAY CLICK ---
-  function onOverlayClick(e) {
-    if (modal) return; // Only one modal at a time
+  // --- CLICK HANDLER IN FEEDBACK MODE ---
+  function onDocumentClick(e) {
+    // Only act if overlay is present (feedback mode)
+    if (!overlay) return;
+    // Prevent default (no link following, etc.)
+    e.preventDefault();
+    e.stopPropagation();
     // Don't trigger if clicking the button itself
-    const btn = document.getElementById(BUTTON_ID);
-    if (btn && (e.target === btn || btn.contains(e.target))) return;
-    // Find the element under the click (ignoring overlay)
-    overlay.style.pointerEvents = 'none';
-    const el = document.elementFromPoint(e.clientX, e.clientY);
-    overlay.style.pointerEvents = '';
-    if (!el || el.id === OVERLAY_ID) return;
-    lastClickTarget = el;
+    if (button && (e.target === button || button.contains(e.target))) return;
+    // Show modal at click position
+    lastClickTarget = e.target;
     showModalAt(e.clientX, e.clientY);
   }
 
-  // --- MODAL ---
+  // --- MODAL CREATION ---
   function showModalAt(x, y) {
+    if (modal) modal.remove();
     modal = document.createElement('div');
     modal.id = MODAL_ID;
     modal.innerHTML = `
@@ -229,10 +225,18 @@
         textarea.focus();
         return;
       }
+      if (!lastClickTarget) {
+        alert('No element selected for feedback.');
+        return;
+      }
       const selector = getUniqueSelector(lastClickTarget);
+      // --- DEBUG LOG ---
+      console.log('[Mirage Feedback] Selector:', selector);
+      console.log('[Mirage Feedback] Comment:', comment);
+      // --- SEND FEEDBACK ---
       sendFeedback(selector, comment);
-      modal.remove();
-      modal = null;
+      // Hide modal and exit feedback mode
+      exitFeedbackMode();
     };
     // Escape closes modal
     modal.addEventListener('keydown', (ev) => {
@@ -243,26 +247,6 @@
     });
     // Prevent overlay click from closing modal
     modal.onclick = (ev) => ev.stopPropagation();
-  }
-
-  // --- TAB TRAP (keep focus in modal) ---
-  function trapTab(e) {
-    if (!modal) return;
-    if (e.key === 'Tab') {
-      const focusables = modal.querySelectorAll('textarea,button');
-      if (!focusables.length) return;
-      const first = focusables[0], last = focusables[focusables.length - 1];
-      if (e.shiftKey && document.activeElement === first) {
-        last.focus();
-        e.preventDefault();
-      } else if (!e.shiftKey && document.activeElement === last) {
-        first.focus();
-        e.preventDefault();
-      }
-    }
-    if (e.key === 'Escape') {
-      if (modal) { modal.remove(); modal = null; }
-    }
   }
 
   // --- CSS SELECTOR GENERATOR ---
@@ -289,7 +273,10 @@
 
   // --- SEND FEEDBACK ---
   function sendFeedback(selector, comment) {
-    // Use the injected Mirage WebSocket connection
+    if (!window.Mirage || !window.Mirage.socket || window.Mirage.socket.readyState !== 1) {
+      alert('Mirage feedback connection not ready.');
+      return;
+    }
     const payload = {
       type: 'feedback',
       data: {
@@ -298,21 +285,9 @@
         path: window.location.pathname
       }
     };
-    if (window.Mirage && window.Mirage.socket && window.Mirage.socket.readyState === 1) {
-      window.Mirage.socket.send(JSON.stringify(payload));
-    } else {
-      const msg = 'Mirage feedback connection not ready.';
-      if (window.Mirage && window.Mirage.socket) {
-        console.error(msg);
-      } else {
-        alert(msg);
-      }
-    }
+    window.Mirage.socket.send(JSON.stringify(payload));
   }
 
-  // --- INIT ---
-  createButton();
-
-  // Expose for manual re-init
-  window.initMirageFeedback = initMirageFeedback;
+  // --- CLEANUP ON PAGE NAVIGATION (OPTIONAL) ---
+  window.addEventListener('beforeunload', exitFeedbackMode);
 })(); 
